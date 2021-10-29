@@ -1,4 +1,4 @@
-# Axis-ask
+# Axis Ask
 
 Ask command for axis
 
