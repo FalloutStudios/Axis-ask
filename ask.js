@@ -6,11 +6,12 @@ const AI = require("./ask/");
 module.exports = new create();
 
 let chatbot = null;
+let askConfig = require('./ask/config.js');
 
 function create(){
     let config = {};
     let language = {};
-    this.versions = ['1.1.0'];
+    this.versions = ['1.1.0','1.1.1'];
     this.arguments = {
         question: {
             required: true,
@@ -25,6 +26,20 @@ function create(){
 
         chatbot = new AI({name: client.user.username, gender: "Male"});
 
+        client.on('messageCreate', async (message) => {
+            if(typeof askConfig.chatbotChannels.find(ch => ch.toString() === message.channelId) === "undefined") return;
+            if(!message.content || message.content == '') return;
+            if(message.author.id === client.user.id || message.author.bot || message.author.system) return;
+
+            message.channel.sendTyping();
+
+            const reply = await ask(message.content, message.author.username, config.owner);
+
+            if(!reply) { await safeMessage.reply(message, action.get(language.error)); return; }
+
+            await safeMessage.reply(message, reply);
+        });
+
         return true;
     }
     this.execute = async (args, message, client, action) => {
@@ -32,9 +47,12 @@ function create(){
         if(sentence.length == 0) { await message.reply(action.get(language.empty)); return; }
 
         message.channel.sendTyping();
-        let reply = await ask(sentence, message.author.username, config.owner);
 
-        if(reply) safeMessage.reply(message, reply);
+        const reply = await ask(message.content, message.author.username, config.owner);
+
+        if(!reply) { await safeMessage.reply(message, action.get(language.error)); return; }
+
+        await safeMessage.reply(message, reply);
     }
 
     this.slash = {
@@ -47,29 +65,33 @@ function create(){
             ),
         async execute(interaction, client, action) {
             await interaction.deferReply();
-            const response = await ask(interaction.options.getString('question'), interaction.member.username, config.owner);
 
-            await interaction.editReply(response);
+            const reply = await ask(interaction.options.getString('question'), interaction.member.tag, config.owner);
+
+            if(!reply) { await interaction.editReply({ content: action.get(language.error), ephemeral: true }); return; }
+
+            await interaction.editReply(reply);
         }
     }
-}
 
-async function ask(message, username, owner){
-    // Get udit api response
-    try {
-        let answer = false;
-        await chatbot.chat(message, username).then((response) => {
-            response = replaceAll(response, 'Udit', owner);
+    async function ask(message, username, owner) {
+        let reply = false;
 
-            answer = response;
-        }).catch((err) => {
+        try {
+            await chatbot.chat(message, removeChars(username)).then(async (response) => {
+                response = replaceAll(response, 'Udit', owner);
+
+                reply = response;
+            }).catch(async (err) => {
+                console.error(err);
+            });
+        } catch(err) {
             console.error(err);
-        });
+        }
 
-        return answer;
-    } catch (err) {
-        console.error(err);
+        return reply;
     }
-
-    return false;
+    function removeChars(string) {
+        return string.toString().replace(/[^\w\s]/gi, '');
+    }
 }
