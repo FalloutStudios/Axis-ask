@@ -1,6 +1,10 @@
 # Axis Ask
 
-Ask command for axis
+Ask command for axis.
+
+## Version
+
+Available for `1.1.0`, `1.1.1`, `1.1.2`
 
 ## Installation
 
